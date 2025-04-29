@@ -10,7 +10,7 @@ st.title("🧪 Классификация аминокислот по Raman-сп
 @st.cache_resource
 
 def load_model():
-    return tf.keras.models.load_model("models/raman_cnn_model.h5")
+    return tf.keras.models.load_model("raman_cnn_model.h5")
 
 model = load_model()
 
