@@ -1,0 +1,69 @@
+import numpy as np
+import pandas as pd
+import os
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv1D, MaxPooling1D, Flatten, Dense, Dropout
+from tensorflow.keras.utils import to_categorical
+from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split
+
+
+def load_data(folder_path="data"):
+    spectra = []
+    labels = []
+    for file in os.listdir(folder_path):
+        if file.endswith(".csv"):
+            path = os.path.join(folder_path, file)
+            df = pd.read_csv(path)
+            spec = df.values.flatten().astype("float32")
+            spec = spec / np.max(spec)  # нормализация
+            spectra.append(spec)
+            label = file.split("_")[0]  # предполагается имя файла: Gly_1.csv, Leu_2.csv и т.д.
+            labels.append(label)
+    return np.array(spectra), np.array(labels)
+
+X, y = load_data("data")  # папка с .csv спектрами
+
+
+le = LabelEncoder()
+y_encoded = le.fit_transform(y)
+y_categorical = to_categorical(y_encoded)
+
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y_categorical, test_size=0.2, random_state=42, stratify=y_encoded
+)
+
+# Преобразование формы данных: (samples, length, 1)
+X_train = np.expand_dims(X_train, axis=-1)
+X_test = np.expand_dims(X_test, axis=-1)
+
+
+model = Sequential([
+    Conv1D(32, kernel_size=5, activation="relu", input_shape=(X_train.shape[1], 1)),
+    MaxPooling1D(pool_size=2),
+    Dropout(0.2),
+    
+    Conv1D(64, kernel_size=3, activation="relu"),
+    MaxPooling1D(pool_size=2),
+    Dropout(0.2),
+    
+    Flatten(),
+    Dense(128, activation="relu"),
+    Dropout(0.3),
+    Dense(y_categorical.shape[1], activation="softmax")
+])
+
+model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
+
+
+model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=30, batch_size=16)
+
+
+model.save("models/raman_cnn_model.h5")
+
+
+import pickle
+with open("models/label_encoder.pkl", "wb") as f:
+    pickle.dump(le, f)
